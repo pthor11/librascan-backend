@@ -1,24 +1,13 @@
 import fastify from 'fastify'
 import cors from 'fastify-cors'
 import TX from './models/TX'
+import fastifySwagger from 'fastify-swagger'
+import swaggerOption from './swagger'
 
 const app = fastify({ logger: false })
 
 app.register(cors, { origin: true })
-
-app.get('/', (request, reply) => {
-    reply
-        .send([
-            {
-                query: '/tx/:version',
-                purpose: 'get single tx by version. Example: /tx/1001'
-            },
-            {
-                query: '/txs',
-                purpose: 'get list of txs. Example: /txs?sort=DSC&limit=10&skip=100'
-            }
-        ])
-})
+app.register(fastifySwagger, swaggerOption)
 
 app.get('/address/:id', async (request, reply) => {
     if (!request.params.id) {
@@ -87,8 +76,8 @@ app.get('/txs/oldfrom/:version', async (request, reply) => {
 const start = async () => {
     try {
         await app.listen(3001, '0.0.0.0')
-
-        console.log(`Server is running on http://localhost:3001`)
+        app.swagger()
+        app.log.info(`server listening on ${app.server.address().port}`)
     } catch (err) {
         app.log.error(err)
         process.exit(1)
