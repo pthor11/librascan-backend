@@ -4,20 +4,20 @@ import TX from './models/TX'
 
 const app = fastify({ logger: false })
 
-app.register(cors, {origin: true })
+app.register(cors, { origin: true })
 
 app.get('/', (request, reply) => {
     reply
-    .send( [
-        {
-            query: '/tx/:version',
-            purpose: 'get single tx by version. Example: /tx/1001'
-        },
-        {
-            query: '/txs',
-            purpose: 'get list of txs. Example: /txs?sort=DSC&limit=10&skip=100'
-        }
-    ])
+        .send([
+            {
+                query: '/tx/:version',
+                purpose: 'get single tx by version. Example: /tx/1001'
+            },
+            {
+                query: '/txs',
+                purpose: 'get list of txs. Example: /txs?sort=DSC&limit=10&skip=100'
+            }
+        ])
 })
 
 app.get('/address/:id', async (request, reply) => {
@@ -26,15 +26,15 @@ app.get('/address/:id', async (request, reply) => {
     } else {
         const address = request.params.id
         try {
-            const txs = await TX.find({$or: [{sender: address}, {receiver: address}]}).sort({version: -1})
+            const txs = await TX.find({ $or: [{ sender: address }, { receiver: address }] }).sort({ version: -1 })
             const sum_received_value = txs.filter(tx => tx.receiver === address).reduce((sum, tx) => sum + tx.amount, 0)
             const sum_sent_value = txs.filter(tx => tx.sender === address).reduce((sum, tx) => sum + tx.amount, 0)
             const balance = sum_received_value - sum_sent_value
 
-            reply.send({balance, txs})
+            reply.send({ balance, txs })
         } catch (error) {
             reply.send(error)
-        } 
+        }
     }
 })
 
@@ -44,23 +44,44 @@ app.get('/tx/:version', async (request, reply) => {
         reply.send(tx)
     } catch (error) {
         reply.send(error)
-    } 
+    }
 })
 
 app.get('/txs', async (request, reply) => {
     const sort = request.query.sort || 'DSC'
-    const limit = Number(request.query.limit) || 10
-    const skip = Number(request.query.skip) || 0
+    const limit = Number(request.query.limit) || 40
 
     try {
-        const txs = await TX.find({}, {_id: 0}).sort(sort === 'DSC' ? {version: -1} : {version: 1}).limit(limit).skip(skip).lean()
+        const txs = await TX.find({}, { _id: 0 }).sort(sort === 'DSC' ? { version: -1 } : { version: 1 }).limit(limit).lean()
+        reply.send(txs)
+    } catch (error) {
+        console.log(error)
+        reply.send(error)
+    }
+
+})
+
+app.get('/txs/newfrom/:version', async (request, reply) => {
+    const version = request.params.version
+    const limit = Number(request.query.limit) || 20
+    try {
+        const txs = await TX.find({$and: [{version: {$gt: version}}, {version: {$lte: version + limit}}]}, {_id: 0}).sort({version: -1}).lean()
         reply.send(txs)
     } catch (error) {
         reply.send(error)
     }
-    
 })
 
+app.get('/txs/oldfrom/:version', async (request, reply) => {
+    const version = request.params.version
+    const limit = Number(request.query.limit) || 20
+    try {
+        const txs = await TX.find({$and: [{version: {$gte: version - limit}}, {version: {$lt: version}}]}, {_id: 0}).sort({version: -1}).lean()
+        reply.send(txs)
+    } catch (error) {
+        reply.send(error)
+    }
+})
 
 
 const start = async () => {
