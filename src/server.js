@@ -9,7 +9,7 @@ const app = fastify({ logger: true })
 app.register(cors, { origin: true })
 app.register(fastifySwagger, swaggerOption)
 
-app.get('/address/:id', { schema: { params: { id: { type: 'integer' } }, querystring: { limit: { type: 'integer' }, skip: { type: 'integer' } } } }, async (request, reply) => {
+app.get('/address/:id', { schema: { params: { id: { type: 'string' } }, querystring: { limit: { type: 'integer' }, skip: { type: 'integer' } } } }, async (request, reply) => {
     const address = request.params.id
     const limit = request.query.limit || 20
     const skip = request.query.skip || 0
