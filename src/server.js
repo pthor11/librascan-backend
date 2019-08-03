@@ -9,7 +9,7 @@ const app = fastify({ logger: true })
 app.register(cors, { origin: true })
 app.register(fastifySwagger, swaggerOption)
 
-app.get('/address/:id', async (request, reply) => {
+app.get('/address/:id', { schema: { params: { id: { type: 'integer' } }, querystring: { limit: { type: 'integer' }, skip: { type: 'integer' } } } }, async (request, reply) => {
     const address = request.params.id
     const limit = request.query.limit || 20
     const skip = request.query.skip || 0
@@ -31,22 +31,22 @@ app.get('/address/:id', async (request, reply) => {
             { $group: { _id: null, sum_sent_value: { $sum: '$amount' } } }
         ]))[0].sum_sent_value : 0
 
-        const totalCount = await TX.countDocuments({$or: [{sender: address}, {receiver: address}]})
+        const totalCount = await TX.countDocuments({ $or: [{ sender: address }, { receiver: address }] })
         // console.log({totalCount})
 
         // console.log({ sum_sent_value });
 
         const balance = sum_received_value - sum_sent_value
 
-        const txs = await TX.find({$or: [{sender: address}, {receiver: address}]}, {_id: 0, version: 1}).sort({version: -1}).skip(skip).limit(limit)
-    
+        const txs = await TX.find({ $or: [{ sender: address }, { receiver: address }] }, { _id: 0, version: 1 }).sort({ version: -1 }).skip(skip).limit(limit)
+
         reply.send({ balance, totalCount, txs })
     } catch (error) {
         reply.send(error)
     }
 })
 
-app.get('/tx/:version', async (request, reply) => {
+app.get('/tx/:version', { schema: { params: { version: { type: 'integer' } } } }, async (request, reply) => {
     try {
         const tx = await TX.findOne({ version: request.params.version }).lean()
         reply.send(tx)
@@ -55,7 +55,7 @@ app.get('/tx/:version', async (request, reply) => {
     }
 })
 
-app.get('/txs', async (request, reply) => {
+app.get('/txs', { schema: { querystring: { sort: { type: 'string' }, limit: { type: 'integer' }, skip: { type: 'integer' } } } }, async (request, reply) => {
     const sort = request.query.sort || 'dsc'
     const limit = Number(request.query.limit) || 20
     const skip = Number(request.query.limit) || 0
