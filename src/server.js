@@ -4,26 +4,45 @@ import TX from './models/TX'
 import fastifySwagger from 'fastify-swagger'
 import swaggerOption from './swagger'
 
-const app = fastify({ logger: false })
+const app = fastify({ logger: true })
 
 app.register(cors, { origin: true })
 app.register(fastifySwagger, swaggerOption)
 
 app.get('/address/:id', async (request, reply) => {
-    if (!request.params.id) {
-        reply.send(null)
-    } else {
-        const address = request.params.id
-        try {
-            const txs = await TX.find({ $or: [{ sender: address }, { receiver: address }] }).sort({ version: -1 })
-            const sum_received_value = txs.filter(tx => tx.receiver === address).reduce((sum, tx) => sum + tx.amount, 0)
-            const sum_sent_value = txs.filter(tx => tx.sender === address).reduce((sum, tx) => sum + tx.amount, 0)
-            const balance = sum_received_value - sum_sent_value
+    const address = request.params.id
+    const limit = request.query.limit || 20
+    const skip = request.query.skip || 0
+    try {
+        const sum_received_value = (await TX.aggregate([
+            { $match: { receiver: address } },
+            { $group: { _id: null, sum_received_value: { $sum: '$amount' } } }
+        ]))[0] ? (await TX.aggregate([
+            { $match: { receiver: address } },
+            { $group: { _id: null, sum_received_value: { $sum: '$amount' } } }
+        ]))[0].sum_received_value : 0
+        // console.log({ sum_received_value });
 
-            reply.send({ balance, txs })
-        } catch (error) {
-            reply.send(error)
-        }
+        const sum_sent_value = (await TX.aggregate([
+            { $match: { sender: address } },
+            { $group: { _id: null, sum_sent_value: { $sum: '$amount' } } }
+        ]))[0] ? (await TX.aggregate([
+            { $match: { sender: address } },
+            { $group: { _id: null, sum_sent_value: { $sum: '$amount' } } }
+        ]))[0].sum_sent_value : 0
+
+        const totalCount = await TX.countDocuments({$or: [{sender: address}, {receiver: address}]})
+        // console.log({totalCount})
+
+        // console.log({ sum_sent_value });
+
+        const balance = sum_received_value - sum_sent_value
+
+        const txs = await TX.find({$or: [{sender: address}, {receiver: address}]}, {_id: 0, version: 1}).sort({version: -1}).skip(skip).limit(limit)
+    
+        reply.send({ balance, totalCount, txs })
+    } catch (error) {
+        reply.send(error)
     }
 })
 
@@ -37,39 +56,18 @@ app.get('/tx/:version', async (request, reply) => {
 })
 
 app.get('/txs', async (request, reply) => {
-    const sort = request.query.sort || 'DSC'
-    const limit = Number(request.query.limit) || 40
+    const sort = request.query.sort || 'dsc'
+    const limit = Number(request.query.limit) || 20
+    const skip = Number(request.query.limit) || 0
 
     try {
-        const txs = await TX.find({}, { _id: 0 }).sort(sort === 'DSC' ? { version: -1 } : { version: 1 }).limit(limit).lean()
+        const txs = await TX.find({}, { _id: 0 }).sort(sort === 'dsc' ? { version: -1 } : { version: 1 }).limit(limit).skip(skip).lean()
         reply.send(txs)
     } catch (error) {
         console.log(error)
         reply.send(error)
     }
 
-})
-
-app.get('/txs/newfrom/:version', async (request, reply) => {
-    const version = request.params.version
-    const limit = Number(request.query.limit) || 20
-    try {
-        const txs = await TX.find({$and: [{version: {$gt: version}}, {version: {$lte: version + limit}}]}, {_id: 0}).sort({version: -1}).lean()
-        reply.send(txs)
-    } catch (error) {
-        reply.send(error)
-    }
-})
-
-app.get('/txs/oldfrom/:version', async (request, reply) => {
-    const version = request.params.version
-    const limit = Number(request.query.limit) || 20
-    try {
-        const txs = await TX.find({$and: [{version: {$gte: version - limit}}, {version: {$lt: version}}]}, {_id: 0}).sort({version: -1}).lean()
-        reply.send(txs)
-    } catch (error) {
-        reply.send(error)
-    }
 })
 
 

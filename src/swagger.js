@@ -1,5 +1,5 @@
 export default {
-    routePrefix: '/api',
+    routePrefix: '/',
     exposeRoute: true,
     swagger: {
         info: {
