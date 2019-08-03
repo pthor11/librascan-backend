@@ -38,7 +38,7 @@ app.get('/address/:id', { schema: { params: { id: { type: 'string' } }, querystr
 
         const balance = sum_received_value - sum_sent_value
 
-        const txs = await TX.find({ $or: [{ sender: address }, { receiver: address }] }, { _id: 0, version: 1 }).sort({ version: -1 }).skip(skip).limit(limit)
+        const txs = await TX.find({ $or: [{ sender: address }, { receiver: address }] }, { _id: 0 }).sort({ version: -1 }).skip(skip).limit(limit).lean()
 
         reply.send({ balance, totalCount, txs })
     } catch (error) {
